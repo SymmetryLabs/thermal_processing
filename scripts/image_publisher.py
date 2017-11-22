@@ -3,6 +3,8 @@ import rospy
 import numpy as np
 from sensor_msgs.msg import Image
 
+# Usage: rosrun thermal_processing image_publisher.py _file:=yourfile.bin _fps:=30
+
 class Publisher(object):
     def __init__(self):
         rospy.init_node("osc", anonymous=True)
@@ -22,6 +24,7 @@ class Publisher(object):
         # self.data = self.generate_fake_data()
         self.data = self.read_data_from_file()
         self.n_images = self.data.shape[0] / self.bytes_per_image
+        rospy.loginfo("File contains %d images", self.n_images)
 
         i = 0
         while not rospy.is_shutdown() and i < self.n_images:
@@ -40,15 +43,12 @@ class Publisher(object):
 
           
     def read_data_from_file(self):
-        return np.fromfile(self.filename, dyype=np.uint8, sep="")
+        return np.fromfile(self.filename, dtype=np.uint8, sep="")
 
     def generate_fake_data(self):
         n = 10000
         data = np.random.randint(low=0, high=256, size=(n * self.bytes_per_image), dtype=np.uint8)
         return data
-
-
-        return None
 
 if __name__ == "__main__":
     pub = Publisher()
