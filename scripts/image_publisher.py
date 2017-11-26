@@ -43,7 +43,7 @@ class Publisher(object):
 
           
     def read_data_from_file(self):
-        return np.fromfile(self.filename, dtype=np.uint8, sep="")
+        return np.memmap(self.filename, dtype=np.uint8)
 
     def generate_fake_data(self):
         n = 10000
