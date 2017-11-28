@@ -100,4 +100,7 @@ class FrameProcessor(object):
         im_with_keypoints = cv2.drawKeypoints(in_color, keypoints, np.array(
             []), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 
+	#print(im_with_keypoints.dtype)
+
+
         return im_with_keypoints

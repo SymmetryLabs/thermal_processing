@@ -19,7 +19,7 @@ class Node(object):
     def callback(self, data):
     	cv_image = self.bridge.imgmsg_to_cv2(data, "mono8")
     	subtracted = self.fp.process(cv_image)
-    	out_image = self.bridge.cv2_to_imgmsg(cv_image, "rgb8")
+    	out_image = self.bridge.cv2_to_imgmsg(subtracted, "rgb8")
     	self.image_pub.publish(out_image)
 
 if __name__ == "__main__":
