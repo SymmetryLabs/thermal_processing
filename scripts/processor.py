@@ -41,10 +41,10 @@ class FrameProcessor(object):
 
         self.fgbg = cv2.createBackgroundSubtractorMOG2()
 
-        with open("../config/transform.json") as f:
+        with open("./config/transform.json") as f:
             self.persp_transform = json.load(f)
 
-        with open("../config/config.json") as f:
+        with open("./config/config.json") as f:
             self.config = json.load(f)
 
         self.osc = OSC.OSCClient()
@@ -97,7 +97,7 @@ class FrameProcessor(object):
         return world_x, world_y
 
     def process(self, frame):
-        with open("../config/config.json") as f:
+        with open("./config/config.json") as f:
             cfg = json.load(f)
             tuning = cfg["cvTuning"]
 
