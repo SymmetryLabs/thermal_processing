@@ -35,10 +35,6 @@ class FrameProcessor(object):
         self.last_frame = None
         self.frame_count = 0
 
-        self.worker = threading.Thread(target=self.compute_means)
-        self.worker.daemon = True
-        # self.worker.start()
-
         self.fgbg = cv2.createBackgroundSubtractorMOG2()
 
         with open("./config/transform.json") as f:
@@ -46,9 +42,15 @@ class FrameProcessor(object):
 
         with open("./config/config.json") as f:
             self.config = json.load(f)
+            self.ping_mode = self.config["cvTuning"]["usePingBGSubtraction"]
 
         self.osc = OSC.OSCClient()
         self.osc.connect((self.config["osc"]["host"], self.config["osc"]["port"]))
+
+        if self.ping_mode:
+            self.worker = threading.Thread(target=self.compute_means)
+            self.worker.daemon = True
+            self.worker.start()
 
     def compute_means(self):
         while True:
@@ -58,14 +60,17 @@ class FrameProcessor(object):
 
             with Timer("new values"):
                 past_copy = np.array(self.past_frames).copy()
-                self.windowed_mean = np.mean(past_copy, axis=0)
                 self.windowed_stdev = np.std(past_copy, axis=0)
+                self.windowed_mean = np.mean(past_copy, axis=0)
 
     def get_ping_foreground(self, frame):
         frame = frame.astype(np.float32)
         self.last_frame = frame
         self.past_frames.append(frame)
         self.frame_count += 1
+
+        if self.windowed_mean is None:
+            return
 
         if self.frame_count < self.n:
             return np.zeros(frame.shape, dtype=np.float32)
@@ -101,11 +106,16 @@ class FrameProcessor(object):
             cfg = json.load(f)
             tuning = cfg["cvTuning"]
 
-        if tuning["upsideDown"]:
-            frame = np.rot90(np.rot90(frame))
-
-        fg = self.fgbg.apply(frame)
         blur = tuning["blur"]
+        if self.ping_mode:
+            fg = self.get_ping_foreground(frame)
+        else:
+            fg = self.fgbg.apply(frame)
+
+        if self.ping_mode and self.windowed_mean is None:
+            return
+
+        fg = fg.astype(np.uint8)
         fg = cv2.blur(fg, (blur, blur))
         fg[fg > 0] = 255
 

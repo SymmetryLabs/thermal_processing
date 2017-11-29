@@ -4,7 +4,7 @@
 		"minDistBetweenBlobs": 20,
 		"minArea": 20,
 		"maxArea": 1000,
-		"upsideDown": true
+		"usePingBGSubtraction": false 
 	},
 	"osc": {
 		"host": "localhost",
