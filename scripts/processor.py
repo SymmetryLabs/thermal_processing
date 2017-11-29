@@ -117,7 +117,8 @@ class FrameProcessor(object):
 
         fg = fg.astype(np.uint8)
         fg = cv2.blur(fg, (blur, blur))
-        fg[fg > 0] = 255
+        if tuning["threshold"]:
+            fg[fg > 0] = 255
 
         params = cv2.SimpleBlobDetector_Params()
         params.filterByCircularity = False
