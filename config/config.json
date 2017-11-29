@@ -1,0 +1,13 @@
+{
+	"cvTuning": {
+		"blur": 5,
+		"minDistBetweenBlobs": 20,
+		"minArea": 20,
+		"maxArea": 1000,
+		"upsideDown": true
+	},
+	"osc": {
+		"host": "localhost",
+		"port": 4343
+	}
+}

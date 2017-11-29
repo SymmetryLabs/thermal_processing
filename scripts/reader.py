@@ -15,8 +15,7 @@ def main():
         # big = cv2.resize(im, (0, 0), fx=2, fy=2)
         fp.process(im)
 
-    
-
+   
 
 if __name__ == "__main__":
     main()

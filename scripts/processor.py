@@ -5,6 +5,9 @@ import time
 import colorsys
 import copy
 import threading
+import OSC
+import sys
+import json
 from collections import deque
 
 
@@ -37,6 +40,15 @@ class FrameProcessor(object):
         # self.worker.start()
 
         self.fgbg = cv2.createBackgroundSubtractorMOG2()
+
+        with open("../config/transform.json") as f:
+            self.persp_transform = json.load(f)
+
+        with open("../config/config.json") as f:
+            self.config = json.load(f)
+
+        self.osc = OSC.OSCClient()
+        self.osc.connect((self.config["osc"]["host"], self.config["osc"]["port"]))
 
     def compute_means(self):
         while True:
@@ -77,9 +89,24 @@ class FrameProcessor(object):
 
         return out
 
+    def photo_to_world(self, x, y):
+        [a, b, c, d, e, f, g, h] = self.persp_transform
+        divisor = g*x + h*y + 1
+        world_x = (a*x + b*y + c) / divisor
+        world_y = (d*x + e*y + f) / divisor
+        return world_x, world_y
+
     def process(self, frame):
+        with open("../config/config.json") as f:
+            cfg = json.load(f)
+            tuning = cfg["cvTuning"]
+
+        if tuning["upsideDown"]:
+            frame = np.rot90(np.rot90(frame))
+
         fg = self.fgbg.apply(frame)
-        fg = cv2.blur(fg, (5, 5))
+        blur = tuning["blur"]
+        fg = cv2.blur(fg, (blur, blur))
         fg[fg > 0] = 255
 
         params = cv2.SimpleBlobDetector_Params()
@@ -87,14 +114,29 @@ class FrameProcessor(object):
         params.filterByConvexity = False
         params.minDistBetweenBlobs = 20
         params.filterByArea = True
-        params.minArea = 50
-        params.maxArea = 1000
+        params.minArea = tuning["minArea"]
+        params.maxArea = tuning["maxArea"]
         params.filterByColor = False
         params.filterByInertia = False
         params.blobColor = 255
 
         detector = cv2.SimpleBlobDetector_create(params)
         keypoints = detector.detect(fg)
+
+        oscmsg = OSC.OSCMessage()
+        oscmsg.setAddress("/blobs")
+        oscmsg.append(time.time())
+        oscmsg.append(len(keypoints))
+
+        for i, k in enumerate(keypoints):
+            x, y = self.photo_to_world(k.pt[0], k.pt[1])
+            size = 1 # TODO
+            oscmsg.append(x)
+            oscmsg.append(y)
+            oscmsg.append(size)
+
+        self.osc.send(oscmsg)
+
 
         in_color = cv2.cvtColor(fg, cv2.COLOR_GRAY2RGB)
         im_with_keypoints = cv2.drawKeypoints(in_color, keypoints, np.array(
