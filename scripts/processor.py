@@ -146,7 +146,8 @@ class FrameProcessor(object):
             oscmsg.append(y)
             oscmsg.append(size)
 
-        self.osc.send(oscmsg)
+        if self.config["osc"]["send"]:
+            self.osc.send(oscmsg)
 
 
         in_color = cv2.cvtColor(fg, cv2.COLOR_GRAY2RGB)
