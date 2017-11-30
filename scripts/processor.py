@@ -8,6 +8,7 @@ import threading
 import OSC
 import sys
 import json
+import codecs
 from collections import deque
 
 
@@ -37,7 +38,7 @@ class FrameProcessor(object):
 
         self.fgbg = cv2.createBackgroundSubtractorMOG2()
 
-        with open("./config/transform.json") as f:
+        with codecs.open("./config/transform.json", "r", encoding="utf-8-sig") as f:
             self.persp_transform = json.load(f)
 
         with open("./config/config.json") as f:
@@ -123,7 +124,7 @@ class FrameProcessor(object):
         params = cv2.SimpleBlobDetector_Params()
         params.filterByCircularity = False
         params.filterByConvexity = False
-        params.minDistBetweenBlobs = 20
+        params.minDistBetweenBlobs = tuning["minDistBetweenBlobs"]
         params.filterByArea = True
         params.minArea = tuning["minArea"]
         params.maxArea = tuning["maxArea"]

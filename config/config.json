@@ -1,15 +1,15 @@
 {
 	"cvTuning": {
-		"blur": 1,
-		"minDistBetweenBlobs": 20,
-		"minArea": 20,
-		"maxArea": 1000,
-		"usePingBGSubtraction": true,
-		"threshold": false 
+		"blur": 3,
+		"minDistBetweenBlobs": 100,
+		"minArea": 100,
+		"maxArea": 5000,
+		"usePingBGSubtraction": false,
+		"threshold": true 
 	},
 	"osc": {
-		"host": "localhost",
+		"host": "169.254.21.24",
 		"port": 4343,
-		"send": false
+		"send": true
 	}
 }
