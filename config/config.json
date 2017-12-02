@@ -1,11 +1,15 @@
 {
 	"cvTuning": {
-		"blur": 3,
+		"blur": 5,
 		"minDistBetweenBlobs": 100,
 		"minArea": 100,
 		"maxArea": 5000,
 		"usePingBGSubtraction": false,
 		"threshold": true 
+	},
+	"bitRange": {
+		"low": 2000,
+		"high": 3000
 	},
 	"osc": {
 		"host": "169.254.21.24",
@@ -13,3 +17,4 @@
 		"send": true
 	}
 }
+	

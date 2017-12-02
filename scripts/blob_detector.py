@@ -17,7 +17,7 @@ class Node(object):
     	rospy.spin()
 
     def callback(self, data):
-    	cv_image = self.bridge.imgmsg_to_cv2(data, "mono8")
+    	cv_image = self.bridge.imgmsg_to_cv2(data, "mono16")
     	subtracted = self.fp.process(cv_image)
         if subtracted is None:
             return

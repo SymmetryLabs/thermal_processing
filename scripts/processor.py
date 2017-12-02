@@ -25,6 +25,8 @@ class Timer(object):
         print("%s took %0.2f ms" % (self.name, elapsed))
 
 
+M = 16384
+
 class FrameProcessor(object):
 
     def __init__(self):
@@ -82,7 +84,7 @@ class FrameProcessor(object):
         with Timer("core"):
             v = (frame + self.last_frame) * 0.5
             dev = np.abs(v - self.windowed_mean) / \
-                np.clip(self.windowed_stdev, 255 * 0.02, 255)
+                np.clip(self.windowed_stdev, M * 0.02, M)
             signal = np.abs(dev - self.ema)
             signal[dev <= 1] = 0
 
@@ -91,7 +93,7 @@ class FrameProcessor(object):
 
             out = signal * 60
             out[signal < 0] = 0
-            out[out > 255] = 255
+            out[out > M] = M
 
         return out
 
@@ -120,7 +122,7 @@ class FrameProcessor(object):
         fg = cv2.blur(fg, (blur, blur))
         if tuning["threshold"]:
             fg[fg > 0] = 255
-
+                    
         params = cv2.SimpleBlobDetector_Params()
         params.filterByCircularity = False
         params.filterByConvexity = False
