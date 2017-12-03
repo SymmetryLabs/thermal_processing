@@ -1,0 +1,24 @@
+{
+	"cvTuning": {
+		"blur": 3,
+		"minDistBetweenBlobs": 10,
+		"minArea": 50,
+		"maxArea": 1000,
+		"usePingBGSubtraction": true,
+		"threshold": true,
+		"noiseSuppression": 0.2, 
+		"gain": 90,
+		"windowFrames": 1000
+	},
+	"bitRange": {
+		"low": 2000,
+		"high": 3000
+	},
+	"osc": {
+		"host": "169.254.21.24",
+		"port": 4343,
+		"send": false
+	},
+	"distortion": [-0.000003, 0, 0, 0, 0]
+}
+	
