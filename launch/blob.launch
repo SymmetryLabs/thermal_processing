@@ -1,0 +1,8 @@
+<launch>
+	<arg name="cam" /> 
+	<node name="blob$(arg cam)" pkg="thermal_processing" type="blob_detector.py" respawn="false">
+		<param name="config" value="$(find thermal_processing)/config/config_$(arg cam).json" />
+		<param name="transform" value="$(find thermal_processing)/config/transform_$(arg cam).json" />
+		<param name="mask" value="$(find thermal_processing)/config/mask_$(arg cam).png" />
+	</node>
+</launch>

@@ -9,6 +9,7 @@ import OSC
 import sys
 import json
 import codecs
+import rospy
 from collections import deque
 
 
@@ -25,27 +26,28 @@ class Timer(object):
         print("%s took %0.2f ms" % (self.name, elapsed))
 
 
-M = 16384
+M = 255
 
 class FrameProcessor(object):
 
-    def __init__(self):
-        self.n = 200
+    def __init__(self, inputs):
+        with open(inputs["config"]) as f:
+            self.config = json.load(f)
+            self.ping_mode = self.config["cvTuning"]["usePingBGSubtraction"]
+
+        self.n = self.config["cvTuning"]["windowFrames"]
         self.past_frames = deque([], maxlen=self.n)
         self.windowed_mean = None
         self.windowed_stdev = None
         self.ema = None
         self.last_frame = None
         self.frame_count = 0
+        self.inputs = inputs
 
-        self.fgbg = cv2.createBackgroundSubtractorMOG2()
+        self.fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=False)
 
-        with codecs.open("./config/transform.json", "r", encoding="utf-8-sig") as f:
+        with codecs.open(self.inputs["transform"], "r", encoding="utf-8-sig") as f:
             self.persp_transform = json.load(f)
-
-        with open("./config/config.json") as f:
-            self.config = json.load(f)
-            self.ping_mode = self.config["cvTuning"]["usePingBGSubtraction"]
 
         self.osc = OSC.OSCClient()
         self.osc.connect((self.config["osc"]["host"], self.config["osc"]["port"]))
@@ -54,6 +56,7 @@ class FrameProcessor(object):
             self.worker = threading.Thread(target=self.compute_means)
             self.worker.daemon = True
             self.worker.start()
+            print("STARTING")
 
     def compute_means(self):
         while True:
@@ -66,7 +69,7 @@ class FrameProcessor(object):
                 self.windowed_stdev = np.std(past_copy, axis=0)
                 self.windowed_mean = np.mean(past_copy, axis=0)
 
-    def get_ping_foreground(self, frame):
+    def get_ping_foreground(self, frame, tuning):
         frame = frame.astype(np.float32)
         self.last_frame = frame
         self.past_frames.append(frame)
@@ -83,15 +86,16 @@ class FrameProcessor(object):
 
         with Timer("core"):
             v = (frame + self.last_frame) * 0.5
-            dev = np.abs(v - self.windowed_mean) / \
-                np.clip(self.windowed_stdev, M * 0.02, M)
-            signal = np.abs(dev - self.ema)
-            signal[dev <= 1] = 0
+            dev = np.clip(v - self.windowed_mean, 0, M) / \
+                np.clip(self.windowed_stdev, M * tuning["noiseSuppression"], M)
+            #signal = np.abs(dev - self.ema)
+            #signal[dev <= 1] = 0
+            signal = dev
 
-            self.ema *= 0.9
-            self.ema += (dev * 0.1)
+            self.ema *= 0.5
+            self.ema += (dev * 0.5)
 
-            out = signal * 60
+            out = signal * tuning["gain"]
             out[signal < 0] = 0
             out[out > M] = M
 
@@ -105,13 +109,25 @@ class FrameProcessor(object):
         return world_x, world_y
 
     def process(self, frame):
-        with open("./config/config.json") as f:
+        with open(self.inputs["config"]) as f:
             cfg = json.load(f)
             tuning = cfg["cvTuning"]
 
+        mat = np.array([
+            [1, 0, frame.shape[1]/2],
+            [0, 1, frame.shape[0]/2],
+            [0, 0, 1]
+        ])
+        dist = np.array(cfg["distortion"])
+        undistorted = cv2.undistort(frame, mat, dist)
+        out_image = self.inputs["bridge"].cv2_to_imgmsg(undistorted, "mono8")
+        self.inputs["debug"].publish(out_image)
+
+        frame = undistorted
+
         blur = tuning["blur"]
         if self.ping_mode:
-            fg = self.get_ping_foreground(frame)
+            fg = self.get_ping_foreground(frame, tuning)
         else:
             fg = self.fgbg.apply(frame)
 
@@ -119,9 +135,26 @@ class FrameProcessor(object):
             return
 
         fg = fg.astype(np.uint8)
-        fg = cv2.blur(fg, (blur, blur))
+
+        fgcopy = fg.copy()
+        in_color_copy = cv2.cvtColor(fgcopy, cv2.COLOR_GRAY2RGB)
+        # return in_color_copy
+
+
+        # kernel = np.ones((1, 1), np.uint8)
+        # fg = cv2.erode(fg, kernel, iterations=1)
+
+        # fg = cv2.blur(fg, (blur, blur))
+        # fg = cv2.blur(fg, (blur, blur))
+
+
+        # fg = cv2.blur(fg, (blur, blur))
+        # fg = cv2.blur(fg, (blur, blur))
         if tuning["threshold"]:
             fg[fg > 0] = 255
+
+        in_color = cv2.cvtColor(fg, cv2.COLOR_GRAY2RGB)
+
                     
         params = cv2.SimpleBlobDetector_Params()
         params.filterByCircularity = False
@@ -136,6 +169,10 @@ class FrameProcessor(object):
 
         detector = cv2.SimpleBlobDetector_create(params)
         keypoints = detector.detect(fg)
+        # keypoints = detector.detect(frame)
+        # in_color = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
+
+        # rospy.loginfo(keypoints[0])
 
         oscmsg = OSC.OSCMessage()
         oscmsg.setAddress("/blobs")
@@ -153,9 +190,9 @@ class FrameProcessor(object):
             self.osc.send(oscmsg)
 
 
-        in_color = cv2.cvtColor(fg, cv2.COLOR_GRAY2RGB)
         im_with_keypoints = cv2.drawKeypoints(in_color, keypoints, np.array(
             []), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+
 
 	#print(im_with_keypoints.dtype)
 

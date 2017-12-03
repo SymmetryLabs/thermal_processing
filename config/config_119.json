@@ -5,7 +5,7 @@
 		"minArea": 50,
 		"maxArea": 1000,
 		"usePingBGSubtraction": true,
-		"threshold": true,
+		"threshold": false,
 		"noiseSuppression": 0.2, 
 		"gain": 90,
 		"windowFrames": 1000

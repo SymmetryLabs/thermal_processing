@@ -10,8 +10,8 @@ class Node(object):
     def __init__(self):
         rospy.init_node("thermal_viz", anonymous=True)
 
-        self.image_pub = rospy.Publisher("/thermal/viz", Image, queue_size=1000)
-        self.image_sub = rospy.Subscriber("/thermal/image_raw", Image, self.callback)
+        self.image_pub = rospy.Publisher("viz", Image, queue_size=1000)
+        self.image_sub = rospy.Subscriber("image_raw", Image, self.callback)
         self.bridge = CvBridge()
 
         self.fp = FrameProcessor()

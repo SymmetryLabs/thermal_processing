@@ -1,0 +1,8 @@
+<launch>
+	<include file="$(find thermal_processing)/launch/blob.launch" ns="/cam118">
+		<arg name="cam" value="118"></arg>
+	</include>
+	<include file="$(find thermal_processing)/launch/blob.launch" ns="/cam119">
+		<arg name="cam" value="119"></arg>
+	</include>
+</launch>

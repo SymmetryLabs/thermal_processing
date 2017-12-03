@@ -1,0 +1,12 @@
+<launch>
+	<include file="$(find flir_gige)/launch/auto.launch">
+		<arg name="device" value="169.254.21.119" />
+		<arg name="raw" value="false" />
+		<arg name="camera" value="cam119" />
+	</include>
+	<include file="$(find flir_gige)/launch/auto.launch">
+		<arg name="device" value="169.254.21.118" />
+		<arg name="raw" value="false" />
+		<arg name="camera" value="cam118" />
+	</include>
+</launch>

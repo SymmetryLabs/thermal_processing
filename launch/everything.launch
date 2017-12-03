@@ -1,0 +1,5 @@
+<launch>
+	<include file="$(find thermal_processing)/launch/all_cams.launch" />
+	<include file="$(find thermal_processing)/launch/all_blobs.launch" />
+	<node name="rqt" pkg="rqt_gui" type="rqt_gui" />
+</launch>

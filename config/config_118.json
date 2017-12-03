@@ -2,10 +2,10 @@
 	"cvTuning": {
 		"blur": 3,
 		"minDistBetweenBlobs": 10,
-		"minArea": 50,
+		"minArea": 30,
 		"maxArea": 1000,
 		"usePingBGSubtraction": true,
-		"threshold": true,
+		"threshold": false,
 		"noiseSuppression": 0.2, 
 		"gain": 90,
 		"windowFrames": 1000
