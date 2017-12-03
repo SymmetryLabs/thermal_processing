@@ -11,6 +11,7 @@ import json
 import codecs
 import rospy
 from collections import deque
+from geometry_msgs.msg import PoseArray, Pose, Point
 
 
 class Timer(object):
@@ -47,7 +48,7 @@ class FrameProcessor(object):
         self.fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=False)
 
         with codecs.open(self.inputs["transform"], "r", encoding="utf-8-sig") as f:
-            self.persp_transform = json.load(f)
+            self.persp_transform = json.load(f)["coefficients"]
 
         self.osc = OSC.OSCClient()
         self.osc.connect((self.config["osc"]["host"], self.config["osc"]["port"]))
@@ -60,14 +61,16 @@ class FrameProcessor(object):
 
     def compute_means(self):
         while True:
-            if len(self.past_frames) < self.n:
+            if len(self.past_frames) == 0:
                 time.sleep(0.05)
                 continue
 
             with Timer("new values"):
                 past_copy = np.array(self.past_frames).copy()
-                self.windowed_stdev = np.std(past_copy, axis=0)
-                self.windowed_mean = np.mean(past_copy, axis=0)
+                stdev = np.std(past_copy, axis=0)
+                mean = np.mean(past_copy, axis=0)
+                self.windowed_stdev = stdev
+                self.windowed_mean = mean
 
     def get_ping_foreground(self, frame, tuning):
         frame = frame.astype(np.float32)
@@ -174,6 +177,12 @@ class FrameProcessor(object):
 
         # rospy.loginfo(keypoints[0])
 
+        ar = PoseArray()
+        ar.header.frame_id = "/map"
+        ar.header.stamp = rospy.Time.now()
+
+
+
         oscmsg = OSC.OSCMessage()
         oscmsg.setAddress("/blobs")
         oscmsg.append(time.time())
@@ -186,12 +195,17 @@ class FrameProcessor(object):
             oscmsg.append(y)
             oscmsg.append(size)
 
+            pose = Pose()
+            pose.position = Point(x, y, 0)
+            ar.poses.append(pose)
+
         if self.config["osc"]["send"]:
             self.osc.send(oscmsg)
 
+        self.inputs["pose_pub"].publish(ar)
 
         im_with_keypoints = cv2.drawKeypoints(in_color, keypoints, np.array(
-            []), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+            []), (255, 0, 0), cv2.DRAW_MATCHES_FLAGS_DEFAULT)
 
 
 	#print(im_with_keypoints.dtype)
