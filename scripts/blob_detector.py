@@ -32,8 +32,8 @@ class Node(object):
 
     def callback(self, data):
     	cv_image = self.bridge.imgmsg_to_cv2(data, "mono8")
-        # with Timer("core"):
-    	subtracted = self.fp.process(cv_image)
+        with Timer("process"):
+        	subtracted = self.fp.process(cv_image)
         if subtracted is None:
             return
     	out_image = self.bridge.cv2_to_imgmsg(subtracted, "rgb8")

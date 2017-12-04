@@ -10,9 +10,12 @@ import sys
 import json
 import codecs
 import rospy
+import colorsys
+from threading import Thread
 from collections import deque
 from geometry_msgs.msg import PoseArray, Pose, Point
-from sort import Sort
+from tracker import Tracker
+
 
 
 class Timer(object):
@@ -25,10 +28,10 @@ class Timer(object):
 
     def __exit__(self, type, value, traceback):
         elapsed = (time.time() - self.start) * 1000
-        print("%s took %0.2f ms" % (self.name, elapsed))
+        if elapsed > 30:
+            rospy.loginfo("%s took %0.2f ms" % (self.name, elapsed))
 
 
-M = 255
 
 class FrameProcessor(object):
 
@@ -38,7 +41,8 @@ class FrameProcessor(object):
             self.ping_mode = self.config["cvTuning"]["usePingBGSubtraction"]
 
         self.n = self.config["cvTuning"]["windowFrames"]
-        self.past_frames = deque([], maxlen=self.n)
+        self.history = deque()
+        self.sq_error_history = deque()
         self.windowed_mean = None
         self.windowed_stdev = None
         self.ema = None
@@ -46,6 +50,11 @@ class FrameProcessor(object):
         self.frame_count = 0
         self.inputs = inputs
         self.start_time = time.time()
+        self.M = 255
+
+        self.hot_mask = cv2.imread(self.inputs["mask"])[:, :, 2]
+        self.hot_mask[self.hot_mask < 255] = 0
+        
 
         self.fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=False)
 
@@ -55,46 +64,55 @@ class FrameProcessor(object):
         self.osc = OSC.OSCClient()
         self.osc.connect((self.config["osc"]["host"], self.config["osc"]["port"]))
 
-        if self.ping_mode:
-            self.worker = threading.Thread(target=self.compute_means)
-            self.worker.daemon = True
-            self.worker.start()
-            print("STARTING")
+        self.tracker = Tracker(self.config["tracker"])
 
-        self.tracker = Sort()
 
-    def compute_means(self):
-        while True:
-            if len(self.past_frames) == 0:
-                time.sleep(0.05)
-                continue
 
-            with Timer("new values"):
-                past_copy = np.array(self.past_frames).copy()
-                stdev = np.std(past_copy, axis=0)
-                mean = np.mean(past_copy, axis=0)
-                self.windowed_stdev = stdev
-                self.windowed_mean = mean
+    def update_means(self, frame):
+        self.history.append(frame)
+        self.running_sum += frame
+
+        if len(self.history) >= (self.n + 1):
+            expired_value = self.history.popleft()
+            self.running_sum -= expired_value
+
+        self.windowed_mean = self.running_sum / len(self.history)
+
+        new_sq_error = np.square(frame - self.windowed_mean)
+        self.sq_error_history.append(new_sq_error)
+        self.error_sum += new_sq_error
+
+        if len(self.sq_error_history) >= (self.n + 1):
+            expired_sq_error = self.sq_error_history.popleft()
+            self.error_sum -= expired_sq_error
+        self.running_stdev = np.sqrt(self.error_sum / len(self.history))
+
 
     def get_ping_foreground(self, frame, tuning):
         frame = frame.astype(np.float32)
+
         self.last_frame = frame
-        self.past_frames.append(frame)
         self.frame_count += 1
 
         if self.windowed_mean is None:
-            return
-
-        if self.frame_count < self.n:
-            return np.zeros(frame.shape, dtype=np.float32)
-
-        if self.ema is None:
+            self.running_sum = np.zeros(frame.shape, dtype=np.float32)
+            self.error_sum = np.zeros(frame.shape, dtype=np.float32)
+            self.windowed_mean = np.zeros(frame.shape, dtype=np.float32)
+            self.windowed_stdev = np.zeros(frame.shape, dtype=np.float32)
             self.ema = np.zeros(frame.shape, dtype=np.float32)
+
+        if (self.frame_count % tuning["frameSample"]) == 0:
+            self.update_means(frame)
 
         with Timer("core"):
             v = (frame + self.last_frame) * 0.5
-            dev = np.clip(v - self.windowed_mean, 0, M) / \
-                np.clip(self.windowed_stdev, M * tuning["noiseSuppression"], M)
+            divisor = np.clip(self.windowed_stdev, self.M * tuning["noiseSuppression"], self.M)
+            clipped = np.clip(v - self.windowed_mean, 0, self.M)
+            absed = np.clip(np.abs(v - self.windowed_mean), 0, self.M)
+            clipped[self.hot_mask == 255] = absed[self.hot_mask == 255] 
+
+
+            dev = clipped / divisor
             #signal = np.abs(dev - self.ema)
             #signal[dev <= 1] = 0
             signal = dev
@@ -104,7 +122,7 @@ class FrameProcessor(object):
 
             out = signal * tuning["gain"]
             out[signal < 0] = 0
-            out[out > M] = M
+            out[out > self.M] = self.M
 
         return out
 
@@ -114,6 +132,10 @@ class FrameProcessor(object):
         world_x = (a*x + b*y + c) / divisor
         world_y = (d*x + e*y + f) / divisor
         return world_x, world_y
+
+    def draw_points(self, im, points, color, rad = 2, solid=False):
+        for pt in points:
+            cv2.circle(im, tuple(map(int, pt)), rad, color, -1 if solid else 1)
 
     def process(self, frame):
         with open(self.inputs["config"]) as f:
@@ -128,6 +150,7 @@ class FrameProcessor(object):
         dist = np.array(cfg["distortion"])
         undistorted = cv2.undistort(frame, mat, dist)
         out_image = self.inputs["bridge"].cv2_to_imgmsg(undistorted, "mono8")
+        # out_image = self.inputs["bridge"].cv2_to_imgmsg(self.hot_mask, "mono8")
         self.inputs["debug"].publish(out_image)
 
         frame = undistorted
@@ -138,8 +161,9 @@ class FrameProcessor(object):
         else:
             fg = self.fgbg.apply(frame)
 
-        if self.ping_mode and self.windowed_mean is None:
+        if self.frame_count < 10:
             return
+
 
         fg = fg.astype(np.uint8)
 
@@ -175,11 +199,8 @@ class FrameProcessor(object):
         params.blobColor = 255
 
         detector = cv2.SimpleBlobDetector_create(params)
-        keypoints = detector.detect(fg)
-        # keypoints = detector.detect(frame)
-        # in_color = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
-
-        # rospy.loginfo(keypoints[0])
+        with Timer("blobs"):
+            keypoints = detector.detect(fg)
 
         ar = PoseArray()
         ar.header.frame_id = "/map"
@@ -198,25 +219,25 @@ class FrameProcessor(object):
         oscmsg.setAddress("/blobs")
         oscmsg.append(self.config["osc"]["sourceId"])
         oscmsg.append(millis)
-        oscmsg.append(len(keypoints))
 
         track_list = list()
 
-        im_with_keypoints = cv2.drawKeypoints(in_color, keypoints, np.array(
-            []), (255, 0, 0), cv2.DRAW_MATCHES_FLAGS_DEFAULT)
+        # im_with_keypoints = cv2.drawKeypoints(in_color, keypoints, np.array(
+            # []), (255, 0, 0), cv2.DRAW_MATCHES_FLAGS_DEFAULT)
 
-        # cv2.putText(
-        #     im_with_keypoints,
-        #     "2.3, 5.0",
-        #     (50, 50),
-        #     cv2.FONT_HERSHEY_SIMPLEX,
-        #     0.3,
-        #     (255, 0, 0)
-        # )
+        keypoints = map(lambda k: k.pt, keypoints)
+        tracks, ids = self.tracker.update(keypoints)
 
-        for i, k in enumerate(keypoints):
-            x, y = self.photo_to_world(k.pt[0], k.pt[1])
+        oscmsg.append(len(tracks))
+
+
+        self.draw_points(in_color, keypoints, (255, 0, 0), solid=True)
+        self.draw_points(in_color, tracks, (0, 0, 255), rad=4)
+
+        for i, k in enumerate(tracks):
+            x, y = self.photo_to_world(*k)
             size = 1 # TODO
+            oscmsg.append(ids[i])
             oscmsg.append(x)
             oscmsg.append(y)
             oscmsg.append(size)
@@ -225,16 +246,17 @@ class FrameProcessor(object):
             pose.position = Point(x, y, 0)
             ar.poses.append(pose)
 
-            track_list.append([x, y, x + 1, y + 1, 1])
-
             cv2.putText(
-                im_with_keypoints,
-                "%d, %d" % (x, y),
-                (int(k.pt[0] + 4), int(k.pt[1] - 4)),
+                in_color,
+                "%s %d, %d" % (ids[i], x, y),
+                (int(k[0] + 4), int(k[1] - 4)),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.32,
-                (255, 0, 0),
+                (0, 0, 255),
             )
+
+        # ntracks = self.tracker.update(np.array(track_list))
+        # rospy.loginfo("TRACKER %d %d", len(keypoints), len(ntracks))
 
 
 
@@ -243,13 +265,13 @@ class FrameProcessor(object):
 
         self.inputs["pose_pub"].publish(ar)
 
+        # ret, thresh = cv2.threshold(fg, 127, 255, 0)
+        # im2, contours, hierarchy = cv2.findContours(thresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        # for i, c in enumerate(contours):
+        #     color = tuple(map(lambda x: x * 255, colorsys.hsv_to_rgb(float(i + 1) * 360.0 / len(contours), 1, 1)))
+        #     rospy.loginfo("NEAT %s", str(color))
+        #     cv2.drawContours(in_color, [c], 0, color, 1)
 
-        tracks = self.tracker.update(np.array(track_list))
-
-        rospy.loginfo("N TRACKS %d", len(tracks))
 
 
-	#print(im_with_keypoints.dtype)
-
-
-        return im_with_keypoints
+        return in_color

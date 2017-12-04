@@ -7,8 +7,14 @@
 		"usePingBGSubtraction": true,
 		"threshold": false,
 		"noiseSuppression": 0.2, 
-		"gain": 90,
-		"windowFrames": 1000
+		"gain": 100,
+		"windowFrames": 1000,
+		"frameSample": 2
+	},
+	"tracker": {
+		"minAge": 10,
+		"maxSkip": 10,
+		"history": 5
 	},
 	"bitRange": {
 		"low": 2000,
@@ -17,7 +23,7 @@
 	"osc": {
 		"send": true,
 		"sourceId": "ne",
-		"host": "192.168.43.43",
+		"host": "169.254.21.100",
 		"port": 4343
 	},
 	"distortion": [-0.000003, 0, 0, 0, 0]
