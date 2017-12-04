@@ -1,8 +1,8 @@
 {
 	"cvTuning": {
 		"blur": 3,
-		"minDistBetweenBlobs": 10,
-		"minArea": 50,
+		"minDistBetweenBlobs": 20,
+		"minArea": 20,
 		"maxArea": 1000,
 		"usePingBGSubtraction": true,
 		"threshold": false,
@@ -15,10 +15,10 @@
 		"high": 3000
 	},
 	"osc": {
-		"host": "169.254.21.24",
-		"port": 4343,
-		"send": false
+		"send": true,
+		"sourceId": "ne",
+		"host": "192.168.43.43",
+		"port": 4343
 	},
 	"distortion": [-0.000003, 0, 0, 0, 0]
 }
-	

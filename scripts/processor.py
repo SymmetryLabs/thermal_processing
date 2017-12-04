@@ -12,6 +12,7 @@ import codecs
 import rospy
 from collections import deque
 from geometry_msgs.msg import PoseArray, Pose, Point
+from sort import Sort
 
 
 class Timer(object):
@@ -44,6 +45,7 @@ class FrameProcessor(object):
         self.last_frame = None
         self.frame_count = 0
         self.inputs = inputs
+        self.start_time = time.time()
 
         self.fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=False)
 
@@ -58,6 +60,8 @@ class FrameProcessor(object):
             self.worker.daemon = True
             self.worker.start()
             print("STARTING")
+
+        self.tracker = Sort()
 
     def compute_means(self):
         while True:
@@ -181,12 +185,34 @@ class FrameProcessor(object):
         ar.header.frame_id = "/map"
         ar.header.stamp = rospy.Time.now()
 
-
+        # timestamp in ms
+        now = time.time()
+        millis = int((now - self.start_time) * 1000)
+        if millis > 0x7fffffff:
+            # OSC integers are limited to 32 bits, so once every ~24 days
+            # we have to reset the timestamp counter to zero.
+            self.start_time = now
+            millis = 0
 
         oscmsg = OSC.OSCMessage()
         oscmsg.setAddress("/blobs")
-        oscmsg.append(time.time())
+        oscmsg.append(self.config["osc"]["sourceId"])
+        oscmsg.append(millis)
         oscmsg.append(len(keypoints))
+
+        track_list = list()
+
+        im_with_keypoints = cv2.drawKeypoints(in_color, keypoints, np.array(
+            []), (255, 0, 0), cv2.DRAW_MATCHES_FLAGS_DEFAULT)
+
+        # cv2.putText(
+        #     im_with_keypoints,
+        #     "2.3, 5.0",
+        #     (50, 50),
+        #     cv2.FONT_HERSHEY_SIMPLEX,
+        #     0.3,
+        #     (255, 0, 0)
+        # )
 
         for i, k in enumerate(keypoints):
             x, y = self.photo_to_world(k.pt[0], k.pt[1])
@@ -199,13 +225,28 @@ class FrameProcessor(object):
             pose.position = Point(x, y, 0)
             ar.poses.append(pose)
 
+            track_list.append([x, y, x + 1, y + 1, 1])
+
+            cv2.putText(
+                im_with_keypoints,
+                "%d, %d" % (x, y),
+                (int(k.pt[0] + 4), int(k.pt[1] - 4)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.32,
+                (255, 0, 0),
+            )
+
+
+
         if self.config["osc"]["send"]:
             self.osc.send(oscmsg)
 
         self.inputs["pose_pub"].publish(ar)
 
-        im_with_keypoints = cv2.drawKeypoints(in_color, keypoints, np.array(
-            []), (255, 0, 0), cv2.DRAW_MATCHES_FLAGS_DEFAULT)
+
+        tracks = self.tracker.update(np.array(track_list))
+
+        rospy.loginfo("N TRACKS %d", len(tracks))
 
 
 	#print(im_with_keypoints.dtype)
