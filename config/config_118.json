@@ -22,8 +22,9 @@
 	},
 	"osc": {
 		"send": true,
+		"record": "/tmp/cam118a.osc",
 		"sourceId": "se",
-		"host": "169.254.21.100",
+		"host": "10.200.1.2",
 		"port": 4343
 	},
 	"distortion": [-0.000003, 0, 0, 0, 0]

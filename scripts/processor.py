@@ -51,6 +51,7 @@ class FrameProcessor(object):
         self.inputs = inputs
         self.start_time = time.time()
         self.M = 255
+        self.osc_client = None
 
         self.hot_mask = cv2.imread(self.inputs["mask"])[:, :, 2]
         self.hot_mask[self.hot_mask < 255] = 0
@@ -60,9 +61,6 @@ class FrameProcessor(object):
 
         with codecs.open(self.inputs["transform"], "r", encoding="utf-8-sig") as f:
             self.persp_transform = json.load(f)["coefficients"]
-
-        self.osc = OSC.OSCClient()
-        self.osc.connect((self.config["osc"]["host"], self.config["osc"]["port"]))
 
         self.tracker = Tracker(self.config["tracker"])
 
@@ -260,8 +258,26 @@ class FrameProcessor(object):
 
 
 
-        if self.config["osc"]["send"]:
-            self.osc.send(oscmsg)
+        osc_config = cfg.get('osc', {})
+        if osc_config.get('send'):
+            if not self.osc_client:
+                try:
+                    client = OSC.OSCClient()
+                    client.connect((osc_config["host"], osc_config["port"]))
+                except:
+                    sys.stderr.write('could not connect: %r\n' % osc_config)
+                else:
+                    self.osc_client = client
+            if self.osc_client:
+                sys.stderr.write('send %r\n' % oscmsg)
+                self.osc_client.send(oscmsg)
+        else:
+            self.osc_client = None
+
+        if osc_config.get('record'):
+            with open(osc_config['record'], 'a') as file:
+                sys.stderr.write('record %r\n' % oscmsg)
+                file.write(json.dumps(list(oscmsg)) + '\n')
 
         self.inputs["pose_pub"].publish(ar)
 
