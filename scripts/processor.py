@@ -89,7 +89,10 @@ class FrameProcessor(object):
     def get_ping_foreground(self, frame, tuning):
         frame = frame.astype(np.float32)
 
-        self.last_frame = frame
+        if self.last_frame is None:
+            self.last_frame = frame
+            return np.zeros_like(frame)
+
         self.frame_count += 1
 
         if self.windowed_mean is None:
@@ -121,6 +124,8 @@ class FrameProcessor(object):
             out = signal * tuning["gain"]
             out[signal < 0] = 0
             out[out > self.M] = self.M
+
+        self.last_frame = frame
 
         return out
 
