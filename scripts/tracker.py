@@ -176,6 +176,11 @@ class Tracker(object):
 		# 	return track_map, key_map, assignments
 
 	def update(self, keypoints):
+		# short-circuit for testing
+		fake_ids = ["id" for k in keypoints]
+		return keypoints, fake_ids
+
+
 		n_before = len(self.tracks)
 		n_after = len(keypoints)
 
