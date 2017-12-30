@@ -274,14 +274,14 @@ class FrameProcessor(object):
                 else:
                     self.osc_client = client
             if self.osc_client:
-                sys.stderr.write('send %r\n' % oscmsg)
+                #sys.stderr.write('send %r\n' % oscmsg)
                 self.osc_client.send(oscmsg)
         else:
             self.osc_client = None
 
         if osc_config.get('record'):
             with open(osc_config['record'], 'a') as file:
-                sys.stderr.write('record %r\n' % oscmsg)
+                #sys.stderr.write('record %r\n' % oscmsg)
                 file.write(json.dumps(list(oscmsg)) + '\n')
 
         self.inputs["pose_pub"].publish(ar)

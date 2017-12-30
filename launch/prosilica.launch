@@ -1,0 +1,12 @@
+<launch>
+	<include ns="color_cam" file="$(find prosilica_camera)/launch/generic.launch">
+		<arg name="camera" value="prosilica" />
+		<arg name="ip_address" value="10.0.0.63" />
+		<arg name="trigger_mode" value="streaming" />
+	</include>
+	<include ns="nir_cam" file="$(find prosilica_camera)/launch/generic.launch">
+		<arg name="camera" value="prosilica" />
+		<arg name="ip_address" value="10.0.0.61" />
+		<arg name="trigger_mode" value="streaming" />
+	</include>
+</launch>
