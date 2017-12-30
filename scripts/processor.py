@@ -109,8 +109,8 @@ class FrameProcessor(object):
             v = (frame + self.last_frame) * 0.5
             divisor = np.clip(self.windowed_stdev, self.M * tuning["noiseSuppression"], self.M)
             clipped = np.clip(v - self.windowed_mean, 0, self.M)
-            absed = np.clip(np.abs(v - self.windowed_mean), 0, self.M)
-            clipped[self.hot_mask == 255] = absed[self.hot_mask == 255] 
+            # absed = np.clip(np.abs(v - self.windowed_mean), 0, self.M)
+            # clipped[self.hot_mask == 255] = absed[self.hot_mask == 255] 
 
 
             dev = clipped / divisor
