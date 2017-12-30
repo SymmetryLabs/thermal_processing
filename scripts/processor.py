@@ -51,7 +51,7 @@ class FrameProcessor(object):
         self.inputs = inputs
         self.start_time = time.time()
         self.M = 255
-        self.osc_client = None
+        self.osc_clients = None
 
         self.hot_mask = cv2.imread(self.inputs["mask"])[:, :, 2]
         self.hot_mask[self.hot_mask < 255] = 0
@@ -265,17 +265,23 @@ class FrameProcessor(object):
 
         osc_config = cfg.get('osc', {})
         if osc_config.get('send'):
-            if not self.osc_client:
-                try:
-                    client = OSC.OSCClient()
-                    client.connect((osc_config["host"], osc_config["port"]))
-                except:
-                    sys.stderr.write('could not connect: %r\n' % osc_config)
-                else:
-                    self.osc_client = client
-            if self.osc_client:
+            hosts = osc_config["hosts"]
+            port =  osc_config["port"]
+            clients = list()
+            if not self.osc_clients:
+                for host in hosts:
+                    try:
+                        client = OSC.OSCClient()
+                        client.connect((host, port))
+                    except:
+                        sys.stderr.write('could not connect: %r\n' % osc_config)
+                    else:
+                        clients.append(client)
+                self.osc_clients = clients
+            if self.osc_clients:
                 #sys.stderr.write('send %r\n' % oscmsg)
-                self.osc_client.send(oscmsg)
+                for client in self.osc_clients:
+                    client.send(oscmsg)
         else:
             self.osc_client = None
 
