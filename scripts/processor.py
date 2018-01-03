@@ -2,6 +2,7 @@ from __future__ import print_function
 import numpy as np
 import cv2
 import time
+from monotonic import monotonic
 import colorsys
 import copy
 import threading
@@ -55,7 +56,6 @@ class FrameProcessor(object):
 
         self.hot_mask = cv2.imread(self.inputs["mask"])[:, :, 2]
         self.hot_mask[self.hot_mask < 255] = 0
-        
 
         self.fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=False)
 
@@ -64,6 +64,7 @@ class FrameProcessor(object):
 
         self.tracker = Tracker(self.config["tracker"])
 
+        self.last_ip_err_time = {}
 
 
     def update_means(self, frame):
@@ -281,7 +282,20 @@ class FrameProcessor(object):
             if self.osc_clients:
                 #sys.stderr.write('send %r\n' % oscmsg)
                 for client in self.osc_clients:
-                    client.send(oscmsg)
+                    try:
+                        client.send(oscmsg)
+                    except Exception as e:
+                        client_address = client.address()
+                        if client_address is None:
+                            continue
+
+                        addr_str = '{0}:{1}'.format(*client_address)
+
+                        if addr_str in self.last_ip_err_time and monotonic() - self.last_ip_err_time[addr_str] < 10:
+                            continue
+
+                        sys.stderr.write('could not send OSC packet to ({0}): {1}\n'.format(addr_str, e))
+                        self.last_ip_err_time[addr_str] = monotonic()
         else:
             self.osc_client = None
 
