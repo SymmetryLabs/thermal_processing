@@ -3,5 +3,5 @@
 	<include file="$(find thermal_processing)/launch/all_blobs.launch" />
 	<!--<include file="$(find thermal_processing)/launch/prosilica.launch" />-->
 	<node name="web_video" pkg="web_video_server" type="web_video_server" />
-	<node name="rqt" pkg="rqt_gui" type="rqt_gui" />
+	<!--<node name="rqt" pkg="rqt_gui" type="rqt_gui" />-->
 </launch>
